@@ -412,11 +412,14 @@
         updateGame('intro');
     }
 
-    // Initialize the game when the window loads
-    window.onload = function() {
-        startGame();
-        console.log("Game started. Go Hawks!");
-    };
+    /*
+    * FIX: Removed the window.onload wrapper. Since the script is at the end of the body,
+    * the DOM elements are guaranteed to be loaded, preventing the 'Loading playbook' hang
+    * that was occurring on some deployed environments like GitHub Pages.
+    */
+    startGame();
+    console.log("Game started. Go Hawks!");
+
 </script>
 
 </body>
