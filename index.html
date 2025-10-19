@@ -365,10 +365,7 @@
     }
 
     function updateGame(sceneId) {
-        if (sceneId === 'intro') {
-            startGame();
-            return;
-        }
+        // We removed the recursive call here. This function is now purely for DISPLAYING a scene.
 
         const scene = Scenes[sceneId];
         game.sceneId = sceneId;
@@ -398,7 +395,18 @@
         updateMetrics();
     }
 
+    // Renamed from startGame to reflect its role as an initialization/reset function
+    function resetGame() {
+        game = { ...INITIAL_STATE };
+        game.currentPPG = calculatePPG(game); // Set initial PPG
+    }
+    
     function makeChoice(nextSceneId) {
+        // If the user selects the 'Play Again' button, reset the state first.
+        if (nextSceneId === 'intro') {
+            resetGame();
+        }
+
         // If the game is concluding, update the stats before showing the final screen
         if (nextSceneId === 'conclusion') {
             updateMetrics();
@@ -406,18 +414,13 @@
         updateGame(nextSceneId);
     }
 
-    function startGame() {
-        game = { ...INITIAL_STATE };
-        game.currentPPG = calculatePPG(game); // Set initial PPG
-        updateGame('intro');
-    }
-
     /*
-    * FIX: Removed the window.onload wrapper. Since the script is at the end of the body,
-    * the DOM elements are guaranteed to be loaded, preventing the 'Loading playbook' hang
-    * that was occurring on some deployed environments like GitHub Pages.
+    * Initialization FIX: We now call resetGame (init state) then updateGame ('intro')
+    * explicitly. This prevents the previous recursive loop and guarantees the DOM
+    * is manipulated correctly on load, which should fix the GitHub Pages issue.
     */
-    startGame();
+    resetGame();
+    updateGame('intro');
     console.log("Game started. Go Hawks!");
 
 </script>
