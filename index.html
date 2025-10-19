@@ -1,0 +1,423 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>The Punting Saga: An Iowa Football Adventure</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #000000; /* Black background */
+            color: #d3d3d3;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .game-container {
+            width: 100%;
+            max-width: 800px;
+            background-color: #1a1a1a; /* Dark gray for the main card */
+            border-radius: 1rem;
+            box-shadow: 0 10px 20px rgba(255, 203, 5, 0.2);
+            border: 3px solid #FFCB05; /* Iowa Gold accent border */
+        }
+        .choice-button {
+            display: block;
+            width: 100%;
+            padding: 1rem 1.5rem;
+            margin-top: 10px;
+            background-color: #333333;
+            color: #FFCB05;
+            font-weight: 700;
+            border: 2px solid #FFCB05;
+            border-radius: 0.5rem;
+            transition: background-color 0.15s, transform 0.05s;
+            text-align: left;
+        }
+        .choice-button:hover {
+            background-color: #4d4d4d;
+            transform: translateY(-1px);
+        }
+        .choice-button:active {
+            transform: translateY(1px);
+        }
+        .text-gold {
+            color: #FFCB05;
+        }
+        .text-iowa-black {
+            color: #000000;
+        }
+        /* Custom scrollbar for better aesthetics */
+        .story-text::-webkit-scrollbar {
+            width: 8px;
+        }
+        .story-text::-webkit-scrollbar-thumb {
+            background: #FFCB05;
+            border-radius: 10px;
+        }
+        .story-text::-webkit-scrollbar-track {
+            background: #1a1a1a;
+        }
+    </style>
+</head>
+<body>
+
+<div id="game" class="game-container p-6 md:p-10">
+    <!-- Game content will be dynamically injected here -->
+    <h1 class="text-3xl md:text-4xl font-black text-center mb-4 border-b-2 border-gold pb-2 text-gold">The Punting Saga: Iowa Adventure</h1>
+    <div id="status" class="bg-gray-800 p-3 rounded-lg text-sm mb-6 grid grid-cols-2 gap-2">
+        <div class="col-span-2 text-center font-bold">The Metrics That Matter:</div>
+        <div id="metric-offense" class="text-red-300">Offense: 0 Yds/Game</div>
+        <div id="metric-field" class="text-green-300">Field Position: +0 Avg</div>
+        <div id="metric-punts" class="text-blue-300">Punts: 0</div>
+        <div id="metric-wins" class="text-gold">Wins: 0 / 12</div>
+    </div>
+    
+    <div id="story-text" class="story-text text-lg mb-6 leading-relaxed bg-gray-900 p-4 rounded-lg h-48 overflow-y-auto">
+        <!-- Initial loading text -->
+        <p class="text-center font-bold text-gold">Loading the playbook...</p>
+    </div>
+
+    <div id="choices" class="space-y-3">
+        <!-- Choices will be injected here -->
+    </div>
+</div>
+
+<script>
+    // Global variables for Firebase environment (required by canvas, even if unused for this simple local game)
+    const __app_id = 'iowa-adventure-game';
+    const __firebase_config = '{}';
+    const __initial_auth_token = undefined;
+    
+    // --- GAME STATE AND INITIALIZATION ---
+
+    let game;
+    let userId = 'player'; // Simple ID for single-player context
+
+    const INITIAL_STATE = {
+        sceneId: 'intro',
+        wins: 0,
+        losses: 0,
+        offenseYards: 0, // Lower is better (satirically)
+        fieldPositionTotal: 0,
+        puntsMade: 0,
+        gamesPlayed: 0,
+        winConditionBonus: false, // The hidden, satirical condition
+        // The impossible goal (the contract metric)
+        contractPPG: 25,
+        currentPPG: 0 
+    };
+
+    // Helper to calculate current PPG based on wins and 'style'
+    function calculatePPG(state) {
+        // Iowa PPG = (Wins * 2.5) + (Field Position * 0.1) - (Punts Made * 0.05)
+        // This is simplified and low, which is the point.
+        const base = state.wins * 2.5;
+        const fieldBonus = state.fieldPositionTotal * 0.1;
+        const puntPenalty = state.puntsMade * 0.05;
+        // Keep it realistic (low)
+        let ppg = Math.max(10, base + fieldBonus - puntPenalty); 
+
+        // Add a slight variance so it's not totally static
+        ppg = ppg + (Math.random() * 2);
+
+        return ppg.toFixed(1);
+    }
+    
+    // Helper to calculate average field position
+    function calculateAvgFieldPosition(state) {
+        return state.gamesPlayed > 0 ? (state.fieldPositionTotal / state.gamesPlayed).toFixed(1) : 0;
+    }
+
+    // --- GAME SCENES AND NARRATIVE ---
+
+    const Scenes = {
+        'intro': {
+            text: "Welcome, Coach. You have been named the new head football coach of the **Iowa Hawkeyes**. President Wilson hands you your contract. There's one specific, non-negotiable metric: your team must average **25.0 points per game** (PPG). This metric is tied to the continued employment of your new offensive coordinator, **Brian**. He’s your guy, and he's going to run the offense with the same schemes they've used since 1999. The first game is against a smaller non-conference foe. It's 3rd and 1 from the opponent's 35-yard line (potential range for the field goal team, which you call 'The Weapon').",
+            choices: [
+                { text: "Run a Draw Play up the Middle (High-Risk, High-Reward: 2 yards or 0)", next: 'down3_choice_run' },
+                { text: "Execute the 'Punt for Field Position' Play (Safe, guaranteed success)", next: 'down3_choice_punt' },
+            ]
+        },
+        'down3_choice_run': {
+            text: (state) => {
+                const gain = Math.random() < 0.6 ? 2 : 0;
+                if (gain === 2) {
+                    game.fieldPositionTotal += 3; // +3 yards gained from play
+                    return `You run the draw. The running back squirts through for a huge, momentum-changing **2-yard gain!** First down, baby! Your field position index rises! The OC nods in approval.`;
+                } else {
+                    game.puntsMade += 1;
+                    return `You run the draw. The line gets zero push. **No gain.** The crowd groans. The OC calls for the PUNT TEAM. You must now follow protocol.`;
+                }
+            },
+            choices: [
+                { text: "If gained 2 yards: Call another Run to the outside.", next: 'game1_halftime' , condition: () => Scenes.down3_choice_run.text(game).includes('2-yard gain')},
+                { text: "If 0 gain: Punt it away. You're Iowa, field position matters.", next: 'game1_halftime' , condition: () => Scenes.down3_choice_run.text(game).includes('No gain')},
+            ]
+        },
+        'down3_choice_punt': {
+            text: (state) => {
+                game.puntsMade += 1;
+                game.fieldPositionTotal += 5; // Good punt, better field position
+                return `The Punter trots onto the field. He executes a towering, perfectly placed punt that lands at the 5-yard line. The defense is ecstatic. You've won the field position battle. You feel a deep, primal satisfaction.`;
+            },
+            choices: [
+                { text: "Prepare the defense. This is the way.", next: 'game1_halftime' }
+            ]
+        },
+        'game1_halftime': {
+            text: (state) => {
+                const score = Math.floor(Math.random() * 7) + 3; // Low score
+                game.currentPPG = calculatePPG(game);
+                
+                return `It's halftime. The score is **Iowa ${score}, Opponent 0**. The points came from a defensive scoop-and-score and a field goal. The offense generated 38 total yards. The OC says, "We need to run the ball more in the second half to set up the 15-yard outs." What do you tell him?`;
+            },
+            choices: [
+                { text: "Agree. Focus on the ground game and clock control.", next: 'game1_game_end_win' },
+                { text: "Suggest throwing a deep, risk-it-all pass (RISKY!)", next: 'game1_game_end_loss' }
+            ]
+        },
+        'game1_game_end_win': {
+            text: (state) => {
+                game.wins += 1;
+                game.gamesPlayed += 1;
+                game.puntsMade += 4; // Add more punts for the second half
+                game.fieldPositionTotal += 5; // More field position gained
+
+                return `The second half is a defensive masterpiece. The offense does just enough to bleed the clock and keep the punter fresh. **Final Score: Iowa 17, Opponent 3.** Your defense and special teams are ranked #1 in the nation. The offense is ranked #125. A journalist asks about the 190 total yards.`;
+            },
+            choices: [
+                { text: "State: 'Winning football is always beautiful. Next question.'", next: 'game2_next' },
+            ]
+        },
+        'game1_game_end_loss': {
+            text: (state) => {
+                game.losses += 1;
+                game.gamesPlayed += 1;
+
+                return `You throw the deep pass! It's intercepted and returned for a touchdown! The opponent ties the game and the momentum shifts. You lose in overtime. **Final Score: Iowa 17, Opponent 20.** The OC looks at you, "I told you we needed to run the ball."`;
+            },
+            choices: [
+                { text: "Accept the blame and vow to run it up the gut more often.", next: 'game2_next' },
+            ]
+        },
+        
+        // --- GAME 2: Big Ten Matchup ---
+        'game2_next': {
+            text: (state) => {
+                game.offenseYards = 180 + Math.floor(Math.random() * 50); // Keep it low
+                game.currentPPG = calculatePPG(game);
+                
+                return `It's a tough road game against a Big Ten rival. The score is tied 7-7 late in the 4th quarter. You have the ball, 4th and 1 on your own 40-yard line. A yard would seal the win, but a stop here gives the rival great field position.`;
+            },
+            choices: [
+                { text: "Go for it. Run the QB Sneak (The 'Brian' Special).", next: 'game2_choice_risk' },
+                { text: "Punt. Trust the defense. Win the field position battle.", next: 'game2_choice_safe' },
+            ]
+        },
+        'game2_choice_risk': {
+            text: (state) => {
+                const result = Math.random() < 0.7 ? 'success' : 'fail';
+                if (result === 'success') {
+                    game.wins += 1;
+                    game.gamesPlayed += 1;
+                    game.puntsMade += 1; 
+                    game.fieldPositionTotal += 2;
+                    return `You run the QB Sneak! He gets the first down by the nose of the ball! Clock runs out. **Iowa Wins, 10-7!** You survive another close call.`;
+                } else {
+                    game.losses += 1;
+                    game.gamesPlayed += 1;
+                    return `The QB slips! **Stop!** The rival gets the ball at the 40 and kicks a game-winning field goal. **Iowa Loses, 7-10.** The OC asks, "Why risk it?"`;
+                }
+            },
+            choices: [
+                { text: "On to the next one.", next: 'game3_next' }
+            ]
+        },
+        'game2_choice_safe': {
+            text: (state) => {
+                const result = Math.random() < 0.85 ? 'success' : 'fail';
+                game.puntsMade += 1;
+                game.fieldPositionTotal += 5; // Excellent field position gain
+
+                if (result === 'success') {
+                    game.wins += 1;
+                    game.gamesPlayed += 1;
+                    return `The punt is boomed! It pins them at the 5. The defense holds and forces a punt. Time expires. **Iowa Wins, 7-3!** The OC smiles: "That's Hawkeye football."`;
+                } else {
+                    game.losses += 1;
+                    game.gamesPlayed += 1;
+                    return `The opposing returner breaks free! He scores! **Iowa Loses, 7-14.** The OC glares: "Should have pinned them deeper."`;
+                }
+            },
+            choices: [
+                { text: "On to the next one.", next: 'game3_next' }
+            ]
+        },
+        
+        // --- GAME 3: The Mid-Season Crisis (The Contract Check) ---
+        'game3_next': {
+            text: (state) => {
+                game.gamesPlayed += 1;
+                // Add a guaranteed win/loss here to speed up the season
+                Math.random() > 0.5 ? game.wins += 1 : game.losses += 1;
+                game.puntsMade += 5;
+                game.fieldPositionTotal += 5;
+                game.currentPPG = calculatePPG(game);
+
+                return `You've reached the middle of the season. Your current record is **${state.wins}-${state.losses}**. Your defense is legendary, but the media is fixated on one thing: The Contract. Your **Current PPG is ${game.currentPPG}**. The required metric is 25.0 PPG. The OC suggests running the ball 40 times next game to "keep the defense fresh."`;
+            },
+            choices: [
+                { text: "Confirm the strategy. Defense wins championships.", next: 'game4_choice_defense' },
+                { text: "Publicly complain about the 25 PPG metric.", next: 'game4_choice_complain' }
+            ]
+        },
+        'game4_choice_defense': {
+            text: (state) => {
+                game.wins += 1; // It always works in the Big Ten
+                game.gamesPlayed += 1;
+                game.fieldPositionTotal += 5;
+                game.puntsMade += 7; 
+                state.winConditionBonus = true; // Set the secret win condition flag
+                game.currentPPG = calculatePPG(game);
+
+                return `You run the ball 40 times. The final score is **Iowa 13, Opponent 10**. The offense generates 177 total yards. The OC says, "We established the run. That's good football." You have successfully embraced **The Iowa Way**.`;
+            },
+            choices: [
+                { text: "Continue the season.", next: 'game_end_final' }
+            ]
+        },
+        'game4_choice_complain': {
+            text: (state) => {
+                game.losses += 1; // Complaining always leads to a loss
+                game.gamesPlayed += 1;
+                game.currentPPG = calculatePPG(game);
+                
+                return `You complain. The distraction throws off the defense. You lose a close one. **Iowa 7, Opponent 14**. The administration is unhappy. You failed to protect the status quo. The OC looks hurt.`;
+            },
+            choices: [
+                { text: "Continue the season and apologize.", next: 'game_end_final' }
+            ]
+        },
+
+        // --- END GAME ---
+        'game_end_final': {
+            text: (state) => {
+                // Play out the rest of the season (4 games left)
+                state.gamesPlayed += 4;
+                state.puntsMade += 20;
+                state.fieldPositionTotal += 20;
+
+                // 2 random wins, 2 random losses for the end stretch
+                const wins = Math.floor(Math.random() * 3) + 1; // 1 to 3 wins
+                state.wins += wins;
+                state.losses += (4 - wins);
+                
+                state.currentPPG = calculatePPG(state);
+
+                return `The season concludes. Your final record is **${state.wins}-${state.losses}**. \n\n
+                You averaged **${state.currentPPG} PPG** (far below the 25.0 contract goal).\n
+                Your defense ranked **Top 5** nationally.\n
+                Your punter had **78 punts** (a school record).\n\n
+                The Athletic Director is waiting in your office. Your fate will be decided by the metrics that *actually* matter in Iowa City.`;
+            },
+            choices: [
+                { text: "Face the Athletic Director.", next: 'conclusion' }
+            ]
+        },
+
+        'conclusion': {
+            text: (state) => {
+                let resultText = "";
+                let winning = false;
+
+                // The ACTUAL winning conditions (satirical)
+                if (state.winConditionBonus && state.wins >= 7 && state.currentPPG < 18) {
+                    winning = true;
+                    resultText = `**YOU WIN! CONTRACT EXTENSION!** The Athletic Director smiles. "The 25 PPG metric was just for the media. We only care that you kept our defensive ranking high, kept Brian employed, and won at least 7 games with minimal offensive risk. You adhered to **The Iowa Way**." You get a 10-year, $70 million extension, and a lifetime supply of white bread.`;
+                } else if (state.wins >= 9) {
+                    winning = true;
+                    resultText = `**YOU WIN! CONTRACT EXTENSION!** Despite your high-flying (relative) 9 wins, you were still boring enough to be acceptable. The AD says, "We worry that ${state.currentPPG} PPG is a little too high, but 9 wins is 9 wins. Try to lower that offensive output next year, please."`;
+                } else {
+                    resultText = `**YOU ARE FIRED.** The Athletic Director shakes his head. "You failed to hit the contract metric of 25 PPG, and you didn't win enough games to justify the embarrassment. Your final record of ${state.wins}-${state.losses} is simply unacceptable for *this* level of boring football. We'll be hiring another coach who promises to **punt more**."`;
+                }
+
+                return resultText + `\n\n**FINAL STATS:**\n- Record: ${state.wins}-${state.losses}\n- Final PPG: ${state.currentPPG} (Target: ${state.contractPPG})\n- Total Punts: ${state.puntsMade}\n- Average Field Position Advantage: ${calculateAvgFieldPosition(state)} yards.`;
+            },
+            choices: [
+                { text: "Play Again (Reset Game)", next: 'intro' }
+            ]
+        }
+    };
+
+    // --- GAME LOGIC FUNCTIONS ---
+
+    function updateMetrics() {
+        game.currentPPG = calculatePPG(game);
+        document.getElementById('metric-offense').textContent = `Offense: ${game.offenseYards} Yds/Game (Ignore This)`;
+        document.getElementById('metric-field').textContent = `Field Position: +${calculateAvgFieldPosition(game)} Avg`;
+        document.getElementById('metric-punts').textContent = `Punts: ${game.puntsMade}`;
+        document.getElementById('metric-wins').textContent = `Wins: ${game.wins} / 12`;
+    }
+
+    function updateGame(sceneId) {
+        if (sceneId === 'intro') {
+            startGame();
+            return;
+        }
+
+        const scene = Scenes[sceneId];
+        game.sceneId = sceneId;
+
+        // Update narrative text
+        const storyTextElement = document.getElementById('story-text');
+        storyTextElement.innerHTML = `<p>${typeof scene.text === 'function' ? scene.text(game) : scene.text}</p>`;
+        storyTextElement.scrollTop = storyTextElement.scrollHeight; // Scroll to bottom
+
+        // Update choices
+        const choicesElement = document.getElementById('choices');
+        choicesElement.innerHTML = ''; // Clear previous choices
+
+        if (scene.choices) {
+            scene.choices.forEach(choice => {
+                // Check condition if present
+                if (!choice.condition || choice.condition(game)) {
+                    const button = document.createElement('button');
+                    button.className = 'choice-button';
+                    button.textContent = choice.text;
+                    button.onclick = () => makeChoice(choice.next);
+                    choicesElement.appendChild(button);
+                }
+            });
+        }
+        
+        updateMetrics();
+    }
+
+    function makeChoice(nextSceneId) {
+        // If the game is concluding, update the stats before showing the final screen
+        if (nextSceneId === 'conclusion') {
+            updateMetrics();
+        }
+        updateGame(nextSceneId);
+    }
+
+    function startGame() {
+        game = { ...INITIAL_STATE };
+        game.currentPPG = calculatePPG(game); // Set initial PPG
+        updateGame('intro');
+    }
+
+    // Initialize the game when the window loads
+    window.onload = function() {
+        startGame();
+        console.log("Game started. Go Hawks!");
+    };
+</script>
+
+</body>
+</html>
